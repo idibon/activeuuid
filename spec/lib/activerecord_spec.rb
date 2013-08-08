@@ -28,8 +28,8 @@ describe ActiveRecord::Base do
       it 'should have proper sql type' do
         spec_for_adapter do |adapters|
           adapters.sqlite3 { column.sql_type.should == 'binary(16)' }
-          adapters.mysql2 { column.sql_type.should == 'binary(16)' }
-          adapters.postgresql { column.sql_type.should == 'uuid' }
+          adapters.mysql2 { column.sql_type.should == 'binary(16)' } if adapters.respond_to? :mysql2
+          adapters.postgresql { column.sql_type.should == 'uuid' } if adapters.respond_to? :postgresql
         end
       end
     end
@@ -42,20 +42,33 @@ describe ActiveRecord::Base do
         connection.add_column table_name, column_name, :string
         spec_for_adapter do |adapters|
           adapters.sqlite3 { connection.change_column table_name, column_name, :uuid }
-          adapters.mysql2 { connection.change_column table_name, column_name, :uuid }
-          # adapters.postgresql { connection.change_column table_name, column_name, :uuid }
+          adapters.mysql2 { connection.change_column table_name, column_name, :uuid } if adapters.respond_to? :mysql2
+          # adapters.postgresql { connection.change_column table_name, column_name, :uuid } if adapters.respond_to? :postgresql
+        end
+      end
+    end
+
+    context '#change_column' do
+      let(:column_name) { :string_col }
+      let(:column) { connection.columns(table_name).detect { |c| c.name.to_sym == column_name } }
+
+      before do
+        connection.add_column table_name, column_name, :string
+        spec_for_adapter do |adapters|
+          adapters.sqlite3 { connection.change_column table_name, column_name, :uuid }
+          adapters.mysql2 { connection.change_column table_name, column_name, :uuid } if adapters.respond_to? :mysql2
+          # adapters.postgresql { connection.change_column table_name, column_name, :uuid } if adapters.respond_to? :postgresql
         end
       end
 
       it 'support changing type from string to uuid' do
         spec_for_adapter do |adapters|
           adapters.sqlite3 { column.sql_type.should == 'binary(16)' }
-          adapters.mysql2 { column.sql_type.should == 'binary(16)' }
-          adapters.postgresql { pending('postgresql can`t change column type to uuid') }
+          adapters.mysql2 { column.sql_type.should == 'binary(16)' } if adapters.respond_to? :mysql2
+          adapters.postgresql { pending('postgresql can`t change column type to uuid') } if adapters.respond_to? :postgresql
         end
       end
     end
-
   end
 end
 
@@ -211,4 +224,3 @@ describe UuidArticleWithNamespace do
     its(:id) { should == uuid }
   end
 end
-
