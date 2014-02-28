@@ -19,7 +19,8 @@ module ActiveUUID
 
       included do
         def type_cast_with_uuid(value)
-          return UUIDTools::UUID.serialize(value) if type == :uuid
+          #for some reason we get back :binary as the type for uuid fields, this hack ensures serializing where we want it
+          return UUIDTools::UUID.serialize(value) if [:uuid, :binary].include?(type) && ( name == 'uuid' || name.end_with?('_id') ) 
           type_cast_without_uuid(value)
         end
 
