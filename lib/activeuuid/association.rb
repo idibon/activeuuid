@@ -13,7 +13,7 @@ module ActiveRecord::Associations
         end
       end
 
-      def associated_records_by_owner
+      def associated_records_by_owner(preloader)
         owners_map = owners_by_key
         owner_keys = owners_map.keys.compact
 
