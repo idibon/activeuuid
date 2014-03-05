@@ -143,7 +143,8 @@ module ActiveUUID
 
     def generate_uuids_if_needed
       primary_key = self.class.primary_key
-      if self.class.columns_hash[primary_key].type == :uuid
+      #hack in jruby-mysql support where the type is :binary
+      if [:uuid, :binary].include? self.class.columns_hash[primary_key].type 
         send("#{primary_key}=", create_uuid) unless send("#{primary_key}?")
       end
     end
