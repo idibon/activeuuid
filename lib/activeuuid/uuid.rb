@@ -147,6 +147,15 @@ module ActiveUUID
       if [:uuid, :binary].include? self.class.columns_hash[primary_key].type 
         send("#{primary_key}=", create_uuid) unless send("#{primary_key}?")
       end
+      
+      #manually sanitize any string values that should be uuid's into uuid objects
+      #note this is a hack, so i just put it in a method that was conveniently being called in the correct place already
+      self.class.columns_hash.each do |column_name, c|
+        if [:uuid, :binary].include?(c.type) && ( c.name == 'uuid' || c.name.end_with?('_id') )
+          val = send(c.name)
+          send("#{c.name}=", UUIDTools::UUID.parse_string(val)) if val.is_a?(String)
+        end
+      end
     end
 
   end
