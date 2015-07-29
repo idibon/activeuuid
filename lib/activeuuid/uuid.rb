@@ -36,6 +36,10 @@ module UUIDTools
       end
     end
 
+    def bytesize
+      16
+    end
+
   private
 
     def self.parse_string(str)
@@ -54,26 +58,26 @@ end
 module Arel
   module Visitors
     class DepthFirst < Arel::Visitors::Visitor
-      def visit_UUIDTools_UUID(object, attribute)
-        object.quoted_id
+      def visit_UUIDTools_UUID(o, a = nil)
+        o.quoted_id
       end
     end
 
     class MySQL < Arel::Visitors::ToSql
-      def visit_UUIDTools_UUID(object, attribute)
-        object.quoted_id
+      def visit_UUIDTools_UUID(o, a = nil)
+        o.quoted_id
       end
     end
 
     class SQLite < Arel::Visitors::ToSql
-      def visit_UUIDTools_UUID(object, attribute)
-        object.quoted_id
+      def visit_UUIDTools_UUID(o, a = nil)
+        o.quoted_id
       end
     end
 
     class PostgreSQL < Arel::Visitors::ToSql
-      def visit_UUIDTools_UUID(object, attribute)
-        "'#{object.to_s}'"
+      def visit_UUIDTools_UUID(o, a = nil)
+        "'#{o.to_s}'"
       end
     end
   end
@@ -114,7 +118,7 @@ module ActiveUUID
         EOS
       end
 
-      def instantiate_with_uuid(record, column_types)
+      def instantiate_with_uuid(record, record_models = nil)
         uuid_columns.each do |uuid_column|
           record[uuid_column] = UUIDTools::UUID.serialize(record[uuid_column]).to_s if record[uuid_column]
         end

@@ -1,6 +1,36 @@
 require 'active_record'
 require 'active_support/concern'
 
+if ActiveRecord::VERSION::MAJOR == 4 and ActiveRecord::VERSION::MINOR == 2
+  module ActiveRecord
+    module Type
+      class UUID < Binary # :nodoc:
+        def type
+          :uuid
+        end
+
+        def cast_value(value)
+          UUIDTools::UUID.serialize(value)
+        end
+      end
+    end
+  end
+
+  module ActiveRecord
+    module ConnectionAdapters
+      module PostgreSQL
+        module OID # :nodoc:
+          class Uuid < Type::Value # :nodoc:
+            def type_cast_from_user(value)
+              UUIDTools::UUID.serialize(value) if value
+            end
+            alias_method :type_cast_from_database, :type_cast_from_user
+          end
+        end
+      end
+    end
+  end
+end
 
 module ActiveUUID
   module Patches
@@ -35,7 +65,7 @@ module ActiveUUID
         end
 
         alias_method_chain :type_cast, :uuid
-        alias_method_chain :type_cast_code, :uuid
+        alias_method_chain :type_cast_code, :uuid if ActiveRecord::VERSION::MAJOR < 4
         alias_method_chain :simplified_type, :uuid
       end
     end
@@ -44,6 +74,12 @@ module ActiveUUID
       extend ActiveSupport::Concern
 
       included do
+        def type_cast_with_uuid(value)
+          return UUIDTools::UUID.serialize(value) if type == :uuid
+          type_cast_without_uuid(value)
+        end
+        alias_method_chain :type_cast, :uuid if ActiveRecord::VERSION::MAJOR >= 4
+
         def simplified_type_with_pguuid(field_type)
           return :uuid if field_type == 'uuid'
           simplified_type_without_pguuid(field_type)
@@ -87,10 +123,10 @@ module ActiveUUID
           quote_without_visiting(value, column)
         end
 
-        def type_cast_with_visiting(value, column = nil)
+        def type_cast_with_visiting(value, column = nil, *args)
           value = UUIDTools::UUID.serialize(value) if column && column.type == :uuid
           value = value.to_s if value.is_a? UUIDTools::UUID
-          type_cast_without_visiting(value, column)
+          type_cast_without_visiting(value, column, *args)
         end
 
         def native_database_types_with_pguuid
@@ -103,12 +139,30 @@ module ActiveUUID
       end
     end
 
+    module AbstractAdapter
+      extend ActiveSupport::Concern
+
+      included do
+        def initialize_type_map_with_uuid(m)
+          initialize_type_map_without_uuid(m)
+          register_class_with_limit m, /binary\(16(,0)?\)/i, ::ActiveRecord::Type::UUID
+        end
+
+        alias_method_chain :initialize_type_map, :uuid
+      end
+    end
+
     def self.apply!
       ActiveRecord::ConnectionAdapters::Table.send :include, Migrations if defined? ActiveRecord::ConnectionAdapters::Table
       ActiveRecord::ConnectionAdapters::TableDefinition.send :include, Migrations if defined? ActiveRecord::ConnectionAdapters::TableDefinition
 
-      ActiveRecord::ConnectionAdapters::Column.send :include, Column
-      ActiveRecord::ConnectionAdapters::PostgreSQLColumn.send :include, PostgreSQLColumn if defined? ActiveRecord::ConnectionAdapters::PostgreSQLColumn
+      if ActiveRecord::VERSION::MAJOR == 4 and ActiveRecord::VERSION::MINOR == 2
+        ActiveRecord::ConnectionAdapters::Mysql2Adapter.send :include, AbstractAdapter if defined? ActiveRecord::ConnectionAdapters::Mysql2Adapter
+        ActiveRecord::ConnectionAdapters::SQLite3Adapter.send :include, AbstractAdapter if defined? ActiveRecord::ConnectionAdapters::SQLite3Adapter
+      else
+        ActiveRecord::ConnectionAdapters::Column.send :include, Column
+        ActiveRecord::ConnectionAdapters::PostgreSQLColumn.send :include, PostgreSQLColumn if defined? ActiveRecord::ConnectionAdapters::PostgreSQLColumn
+      end
 
       ActiveRecord::ConnectionAdapters::Mysql2Adapter.send :include, Quoting if defined? ActiveRecord::ConnectionAdapters::Mysql2Adapter
       ActiveRecord::ConnectionAdapters::SQLite3Adapter.send :include, Quoting if defined? ActiveRecord::ConnectionAdapters::SQLite3Adapter
